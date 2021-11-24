@@ -13,6 +13,33 @@ nn::os::UserExceptionInfo exception_info;
 
 const char* RomMountName = "rom";
 
+void printStackTrace(u64 fp, u64 sp, u64 pc) {
+    uintptr_t backtrace[64] = {};
+    int addrCount = nn::diag::GetBacktrace(backtrace, 64, fp, sp, pc);
+    for (int i = 0; i < addrCount; i++) {
+        uintptr_t addr = backtrace[i];
+        if (addr == 0) {
+            continue;
+        }
+        char name[256] = {};
+        nn::diag::GetSymbolName(name, 255, addr);
+
+        uintptr_t symbolAddr = 0;
+        nn::ro::LookupSymbol(&symbolAddr, name);
+
+        const char* displayName = strnlen(name, 255) > 0 ? name : "(None)";
+
+        uintptr_t adjustedAddress = addr - skyline::utils::g_MainTextAddr + 0x7100000000;
+        s64 textRelativeAddress = addr - skyline::utils::g_MainTextAddr;
+        uintptr_t symbolRelativeAddress = addr - symbolAddr;
+
+        skyline::logger::s_Instance->LogFormat("[%d] Address: %" PRIx64 " (.text+%lli), Symbol: %s+%" PRIx64,
+            i, adjustedAddress, textRelativeAddress, displayName, symbolRelativeAddress);
+    }
+
+    skyline::logger::s_Instance->Flush();
+}
+
 void exception_handler(nn::os::UserExceptionInfo* info) {
     skyline::logger::s_Instance->LogFormat("Exception occurred!");
 
@@ -24,6 +51,9 @@ void exception_handler(nn::os::UserExceptionInfo* info) {
     skyline::logger::s_Instance->LogFormat("SP: %" PRIx64, info->SP.x);
     skyline::logger::s_Instance->LogFormat("PC: %" PRIx64, info->PC.x);
     skyline::logger::s_Instance->Flush();
+
+    skyline::logger::s_Instance->LogFormat("\nStack trace:");
+    printStackTrace(info->FP.x, info->SP.x, info->PC.x);
 }
 
 void* (*lookupGlobalManualImpl)(const char* symName);
@@ -37,16 +67,52 @@ void* handleLookupGlobalManual(const char* symName) {
     return result;
 }
 
-Result (*handleLookupSymbolImpl)(uintptr_t* pOutAddress, const char* name);
+Result (*lookupSymbolImpl)(uintptr_t* pOutAddress, const char* name);
 
 Result handleLookupSymbol(uintptr_t* pOutAddress, const char* name) {
-    Result res = handleLookupSymbolImpl(pOutAddress, name);
-    if (R_FAILED(res)) {
+    Result res = lookupSymbolImpl(pOutAddress, name);
+    if (R_FAILED(res) && name != nullptr) {
         uintptr_t mapValue = skyline::utils::SymbolMap::getSymbolAddress(std::string(name));
         if (mapValue != 0) {
             *pOutAddress = mapValue;
             return 0;
         }
+    }
+
+    return res;
+}
+
+u32* (*getSymbolNameImpl)(char*, u64, u64);
+
+u32* handleGetSymbolName(char* name, u64 nameSize, u64 addr) {
+    u32* res = getSymbolNameImpl(name, nameSize, addr);
+    if (name == nullptr || addr == 0) {
+        return res;
+    }
+
+    std::string nameFromSymbolMap = skyline::utils::SymbolMap::getSymbolName(addr);
+    if (nameFromSymbolMap == "") {
+        return res;
+    }
+    // skyline::logger::s_Instance->LogFormat("!!!!!!!!!!why");
+
+    // Find out which symbol matches the address more closely
+    uintptr_t origSymbolAddr = 0;
+    if (R_FAILED(nn::ro::LookupSymbol(&origSymbolAddr, name))) {
+        return res;
+    }
+
+    uintptr_t symbolMapAddr = 0;
+    if (R_FAILED(nn::ro::LookupSymbol(&symbolMapAddr, nameFromSymbolMap.c_str()))) {
+        return res;
+    }
+
+    skyline::logger::s_Instance->LogFormat("!!!!!!!!!!!!!! closest match: %s @ %p", nameFromSymbolMap.c_str(), symbolMapAddr);
+
+
+    if (addr - symbolMapAddr < addr - origSymbolAddr) {
+        memset(name, 0, nameSize);
+        strncpy(name, nameFromSymbolMap.c_str(), nameSize - 1);
     }
 
     return res;
@@ -78,7 +144,10 @@ static skyline::utils::Task* after_romfs_task = new skyline::utils::Task{[]() {
 
         // Also handle manual calls to nn::ro::LookupSymbol
         A64HookFunction(reinterpret_cast<void*>(nn::ro::LookupSymbol), reinterpret_cast<void*>(handleLookupSymbol),
-           reinterpret_cast<void**>(&handleLookupSymbolImpl));
+           reinterpret_cast<void**>(&lookupSymbolImpl));
+
+        //A64HookFunction(reinterpret_cast<void*>(nn::diag::GetSymbolName), reinterpret_cast<void*>(handleGetSymbolName),
+         //  reinterpret_cast<void**>(&getSymbolNameImpl));
 
         skyline::logger::s_Instance->LogFormat("[skyline_main] Installed symbol map hooks.");
     }

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <unordered_map>
+#include <algorithm>
 
 #include "nn/fs.h"
 #include "skyline/logger/Logger.hpp"
@@ -12,7 +13,16 @@ namespace skyline::utils::SymbolMap {
 
 static constexpr auto MAP_PATH = "skyline/maps/main.map";
 
+struct Symbol {
+    uintptr_t address;
+    std::string name;
+
+    Symbol(uintptr_t address, std::string name): address(address), name(name) {}
+};
+
 static std::unordered_map<std::string, uintptr_t> nameToAddr;
+static std::vector<Symbol> symbols;
+static bool symbolsSorted = false;
 
 class LineWalker {
   public:
@@ -170,8 +180,12 @@ static void parse(LineWalker& walker) {
 
         matchedSymbolCount++;
         nameToAddr[std::string(symName)] = absoluteAddr;
+        symbols.push_back(Symbol(absoluteAddr, std::string(symName)));
     }
 
+    std::sort(symbols.begin(), symbols.end(), [](Symbol a, Symbol b) { return a.address < b.address; });
+
+    symbolsSorted = true;
     skyline::logger::s_Instance->LogFormat("[SymbolMap] Read %d symbols from symbol map. %d symbols were skipped "
         "because their sections could not be identified.", matchedSymbolCount, unmatchedSymbolCount);
 }
@@ -227,6 +241,22 @@ bool tryLoad() {
 
 uintptr_t getSymbolAddress(std::string name) {
     return nameToAddr[name];
+}
+
+std::string getSymbolName(uintptr_t address) {
+    // Lazily sort symbols when it's first required to avoid negatively impacting startup time
+    if (!symbolsSorted) {
+        std::sort(symbols.begin(), symbols.end(), [](Symbol a, Symbol b) { return a.address < b.address; });
+        symbolsSorted = true;
+    }
+
+    for (auto& sym: symbols) {
+        if (sym.address > address) {
+            return sym.name;
+        }
+    }
+
+    return "";
 }
 
 }  // namespace skyline::utils::SymbolMap

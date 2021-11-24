@@ -23,6 +23,7 @@ namespace diag {
         void LogImpl(nn::diag::LogMetaData const&, char const*, ...);
         void AbortImpl(char const*, char const*, char const*, s32);
         void VAbortImpl(char const*, char const*, char const*, int, Result const*, ::nn::os::UserExceptionInfo*, char const* fmt, va_list args);
+        Result GetNearestExportedSymbol(char* buffer, u64* size, uintptr_t symbolAddr);
     };  // namespace detail
 
     // MODULE / SYMBOL
@@ -32,5 +33,6 @@ namespace diag {
     u64 GetSymbolSize(u64 addr);
 
     int GetBacktrace(uintptr_t* pOutArray, int arrayCountMax);
+    int GetBacktrace(uintptr_t* pOutArray, int arrayCountMax, u64 fp, u64 sp, u64 pc);
 };  // namespace diag
 };  // namespace nn
