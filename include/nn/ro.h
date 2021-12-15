@@ -103,7 +103,7 @@ namespace ro {
 
     Result RegisterModuleInfo(RegistrationInfo*, void const*);
     Result RegisterModuleInfo(RegistrationInfo*, void const*, uint);
-    Result UnregisterModuleInfo(RegistrationInfo*, void const*);
+    Result UnregisterModuleInfo(RegistrationInfo*);
 };  // namespace ro
 
 };  // namespace nn
