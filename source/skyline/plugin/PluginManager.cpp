@@ -57,6 +57,14 @@ namespace plugin {
     }
 
     bool Manager::LoadPluginModulesImpl() {
+        if (m_isLoading) {
+            // If we're already loading, set a flag and bail out to avoid crashing
+            m_queuePluginLoad = true;
+            return true;
+        }
+        m_isLoading = true;
+        m_queuePluginLoad = false;
+
         if (!RegisterNrr()) {
             // free all loaded plugins
             m_pluginInfos.clear();
@@ -79,10 +87,9 @@ namespace plugin {
         }
 
         // execute plugin entrypoints
-
-        pluginInfoIter = m_pluginInfos.begin() + m_loadedPluginCount;
-        while (pluginInfoIter != m_pluginInfos.end()) {
-            auto& plugin = *pluginInfoIter;
+        size_t totalPluginCount = m_pluginInfos.size();
+        for (size_t i = m_loadedPluginCount; i < totalPluginCount; i++) {
+            auto& plugin = m_pluginInfos[i];
 
             skyline::logger::s_Instance->LogFormat("[PluginManager] Running `main` for %s", plugin.Path.c_str(),
                                                    &plugin.Module.Name);
@@ -93,6 +100,9 @@ namespace plugin {
 
             if (pluginEntrypoint != NULL && R_SUCCEEDED(rc)) {
                 pluginEntrypoint();
+
+                // If the vector was resized in the entry point, the plugin reference is dangling
+                auto& plugin = m_pluginInfos[i];
                 skyline::logger::s_Instance->LogFormat("[PluginManager] Finished running `main` for '%s' (0x%x)",
                                                        plugin.Path.c_str(), rc);
             } else {
@@ -100,10 +110,15 @@ namespace plugin {
                 skyline::logger::s_Instance->LogFormat("[PluginManager] Failed to lookup symbol for '%s' (0x%x)",
                                                        plugin.Path.c_str(), rc);
             }
-
-            pluginInfoIter++;
         }
-        m_loadedPluginCount = m_pluginInfos.size();
+        m_loadedPluginCount = totalPluginCount;
+
+        m_isLoading = false;
+        if (m_queuePluginLoad) {
+            // A plugin has requested to load other modules in its main()
+            m_queuePluginLoad = false;
+            LoadPluginModulesImpl();
+        }
 
         return success;
     }

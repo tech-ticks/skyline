@@ -31,6 +31,8 @@ namespace plugin {
         nn::ro::RegistrationInfo m_registrationInfo;
         std::set<utils::Sha256Hash> m_sortedHashes;
         bool m_nrrRegistered = false;
+        bool m_isLoading = false;
+        bool m_queuePluginLoad = false;
         int m_loadedPluginCount = 0;
 
         static inline auto& GetInstance() {
