@@ -12,5 +12,6 @@ class KernelLogger : public Logger {
     virtual void Initialize();
     virtual void SendRaw(void*, size_t);
     virtual std::string FriendlyName() { return "KernelLogger"; }
+    virtual bool ShouldFlush();
 };
 };  // namespace skyline::logger

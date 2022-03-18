@@ -1,6 +1,6 @@
 #include "main.hpp"
 
-#include "skyline/logger/TcpLogger.hpp"
+#include "skyline/logger/KernelLogger.hpp"
 #include "skyline/utils/ipc.hpp"
 #include "skyline/utils/cpputils.hpp"
 #include "skyline/utils/utils.h"
@@ -112,7 +112,7 @@ void skyline_main() {
     skyline::logger::setup_socket_hooks();
 
     // initialize logger
-    skyline::logger::s_Instance = new skyline::logger::TcpLogger();
+    skyline::logger::s_Instance = new skyline::logger::KernelLogger();
     skyline::logger::s_Instance->Log("[skyline_main] Begining initialization.\n");
 
     // override exception handler to dump info
