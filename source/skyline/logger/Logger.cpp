@@ -83,6 +83,7 @@ void Logger::Log(const char* data, size_t size) {
     // ptr[size] = '\n';
 
     AddToQueue(ptr);
+    Flush();
     return;
 }
 
