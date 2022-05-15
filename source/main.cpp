@@ -26,16 +26,17 @@ void exception_handler(nn::os::UserExceptionInfo* info) {
     skyline::logger::s_Instance->Flush();
 }
 
-void* (*lookupGlobalManualImpl)(const char* symName);
+void* (*lookupGlobalManualImpl)(const void* module, const char* symName);
 
-void* handleLookupGlobalManual(const char* symName) {
-    void* result = lookupGlobalManualImpl(symName);
+void* handleLookupGlobalManual(const void* module, const char* symName) {
+    void* result = lookupGlobalManualImpl(module, symName);
     if (result == nullptr) {
         uintptr_t mapValue = skyline::utils::SymbolMap::getSymbolAddress(std::string(symName));
         return reinterpret_cast<void*>(mapValue);
     }
     return result;
 }
+
 
 Result (*handleLookupSymbolImpl)(uintptr_t* pOutAddress, const char* name);
 
@@ -66,15 +67,8 @@ static skyline::utils::Task* after_romfs_task = new skyline::utils::Task{[]() {
     if (skyline::utils::SymbolMap::tryLoad()) {
         // If a symbol map was loaded, hook the global symbol lookup function
         // Apparently, this function isn't called for every symbol, but always if a symbol couldn't be found
-        uintptr_t lookupGlobalManualPtr;
-        nn::ro::LookupSymbol(&lookupGlobalManualPtr, "_ZN2nn2ro6detail18LookupGlobalManualEPKc");
-        if (lookupGlobalManualPtr != 0) {
-            A64HookFunction(reinterpret_cast<void*>(lookupGlobalManualPtr),
-                reinterpret_cast<void*>(handleLookupGlobalManual), reinterpret_cast<void**>(&lookupGlobalManualImpl));
-        } else {
-            skyline::logger::s_Instance->LogFormat("[skyline_main] Failed to hook nn::ro::detail::LookupGlobalManual. "
-                "Symbols from maps cannot be used.");
-        }
+        A64HookFunction(reinterpret_cast<void*>(nn::ro::detail::LookupGlobalManual),
+            reinterpret_cast<void*>(handleLookupGlobalManual), reinterpret_cast<void**>(&lookupGlobalManualImpl));
 
         // Also handle manual calls to nn::ro::LookupSymbol
         A64HookFunction(reinterpret_cast<void*>(nn::ro::LookupSymbol), reinterpret_cast<void*>(handleLookupSymbol),
