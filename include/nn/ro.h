@@ -104,6 +104,13 @@ namespace ro {
     Result RegisterModuleInfo(RegistrationInfo*, void const*);
     Result RegisterModuleInfo(RegistrationInfo*, void const*, uint);
     Result UnregisterModuleInfo(RegistrationInfo*);
+
+    namespace detail {
+        struct RoModule;
+        void* LookupGlobalManual(const char*);
+        void* LookupGlobalManual(nn::ro::detail::RoModule const*, const char*);
+    };  // namespace detail
+    
 };  // namespace ro
 
 };  // namespace nn

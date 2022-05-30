@@ -26,10 +26,21 @@ void exception_handler(nn::os::UserExceptionInfo* info) {
     skyline::logger::s_Instance->Flush();
 }
 
-void* (*lookupGlobalManualImpl)(const char* symName);
+void* (*lookupGlobalManualImpl)();
 
 void* handleLookupGlobalManual(const char* symName) {
-    void* result = lookupGlobalManualImpl(symName);
+    void* (*func_ptr)(const char*) = (void* (*)(const char*))(lookupGlobalManualImpl);
+    void* result = func_ptr(symName);
+    if (result == nullptr) {
+        uintptr_t mapValue = skyline::utils::SymbolMap::getSymbolAddress(std::string(symName));
+        return reinterpret_cast<void*>(mapValue);
+    }
+    return result;
+}
+
+void* handleLookupGlobalManual(const void* module, const char* symName) {
+    void* (*func_ptr)(const void*, const char*) = (void* (*)(const void*, const char*))(lookupGlobalManualImpl);
+    void* result = func_ptr(module, symName);
     if (result == nullptr) {
         uintptr_t mapValue = skyline::utils::SymbolMap::getSymbolAddress(std::string(symName));
         return reinterpret_cast<void*>(mapValue);
@@ -66,16 +77,18 @@ static skyline::utils::Task* after_romfs_task = new skyline::utils::Task{[]() {
     if (skyline::utils::SymbolMap::tryLoad()) {
         // If a symbol map was loaded, hook the global symbol lookup function
         // Apparently, this function isn't called for every symbol, but always if a symbol couldn't be found
-        uintptr_t lookupGlobalManualPtr;
-        nn::ro::LookupSymbol(&lookupGlobalManualPtr, "_ZN2nn2ro6detail18LookupGlobalManualEPKc");
-        if (lookupGlobalManualPtr != 0) {
-            A64HookFunction(reinterpret_cast<void*>(lookupGlobalManualPtr),
-                reinterpret_cast<void*>(handleLookupGlobalManual), reinterpret_cast<void**>(&lookupGlobalManualImpl));
-        } else {
+        if (auto func_ptr = (void* (*)(const char*))nn::ro::detail::LookupGlobalManual) {
+            A64HookFunction(reinterpret_cast<void*>(func_ptr),
+                reinterpret_cast<void*>((void* (*)(const char*))handleLookupGlobalManual), reinterpret_cast<void**>(&lookupGlobalManualImpl));
+        }
+        else if (auto func_ptr = (void* (*)(nn::ro::detail::RoModule const*, const char*))nn::ro::detail::LookupGlobalManual) {
+            A64HookFunction(reinterpret_cast<void*>(func_ptr),
+                reinterpret_cast<void*>((void* (*)(const void*, const char*))handleLookupGlobalManual), reinterpret_cast<void**>(&lookupGlobalManualImpl));
+        }
+        else {
             skyline::logger::s_Instance->LogFormat("[skyline_main] Failed to hook nn::ro::detail::LookupGlobalManual. "
                 "Symbols from maps cannot be used.");
         }
-
         // Also handle manual calls to nn::ro::LookupSymbol
         A64HookFunction(reinterpret_cast<void*>(nn::ro::LookupSymbol), reinterpret_cast<void*>(handleLookupSymbol),
            reinterpret_cast<void**>(&handleLookupSymbolImpl));
