@@ -29,8 +29,8 @@ void exception_handler(nn::os::UserExceptionInfo* info) {
 void* (*lookupGlobalManualImpl)();
 
 void* handleLookupGlobalManual(const char* symName) {
-    void* (*func)(const char*) = (void* (*)(const char*))(lookupGlobalManualImpl);
-    void* result = func(symName);
+    void* (*func_ptr)(const char*) = (void* (*)(const char*))(lookupGlobalManualImpl);
+    void* result = func_ptr(symName);
     if (result == nullptr) {
         uintptr_t mapValue = skyline::utils::SymbolMap::getSymbolAddress(std::string(symName));
         return reinterpret_cast<void*>(mapValue);
@@ -39,8 +39,8 @@ void* handleLookupGlobalManual(const char* symName) {
 }
 
 void* handleLookupGlobalManual(const void* module, const char* symName) {
-    void* (*func)(const void*, const char*) = (void* (*)(const void*, const char*))(lookupGlobalManualImpl);
-    void* result = func(module, symName);
+    void* (*func_ptr)(const void*, const char*) = (void* (*)(const void*, const char*))(lookupGlobalManualImpl);
+    void* result = func_ptr(module, symName);
     if (result == nullptr) {
         uintptr_t mapValue = skyline::utils::SymbolMap::getSymbolAddress(std::string(symName));
         return reinterpret_cast<void*>(mapValue);
