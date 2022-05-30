@@ -26,7 +26,7 @@ void exception_handler(nn::os::UserExceptionInfo* info) {
     skyline::logger::s_Instance->Flush();
 }
 
-void *(*lookupGlobalManualImpl)();
+void* (*lookupGlobalManualImpl)();
 
 void* handleLookupGlobalManual(const char* symName) {
     void* (*func)(const char*) = (void* (*)(const char*))(lookupGlobalManualImpl);
