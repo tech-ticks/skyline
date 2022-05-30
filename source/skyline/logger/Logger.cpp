@@ -6,6 +6,16 @@
 #include "mem.h"
 #include "operator.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "skyline/nx/kernel/svc.h"
+
+#ifdef __cplusplus
+}
+#endif
+
 namespace skyline::logger {
 
 Logger* s_Instance;
@@ -83,6 +93,7 @@ void Logger::Log(const char* data, size_t size) {
     // ptr[size] = '\n';
 
     AddToQueue(ptr);
+    svcOutputDebugString(ptr, size);
     return;
 }
 
