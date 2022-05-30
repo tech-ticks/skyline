@@ -107,6 +107,7 @@ namespace ro {
 
     namespace detail {
         struct RoModule;
+        void* LookupGlobalManual(const char*);
         void* LookupGlobalManual(nn::ro::detail::RoModule const*, const char*);
     };  // namespace detail
     
